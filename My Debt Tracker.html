@@ -1,0 +1,503 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>My Debt Tracker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column. Big "left to pay" figure on top, open debts as cards, finished debts as a quiet list, add form at the bottom. */
+:root {
+  --bg: #f2f5f3;
+  --surface: #ffffff;
+  --fg: #14211c;
+  --muted: #5b6b64;
+  --line: #d9e1dc;
+  --track: #e3e9e5;
+  --accent: #17694f;
+  --accent-fg: #ffffff;
+  --warn: #b4400f;
+  --font-display: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1613; --surface: #16211d; --fg: #e8efeb; --muted: #9aaba3;
+    --line: #26352f; --track: #223029; --accent: #4fc294; --accent-fg: #06231a; --warn: #f0925f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1613; --surface: #16211d; --fg: #e8efeb; --muted: #9aaba3;
+  --line: #26352f; --track: #223029; --accent: #4fc294; --accent-fg: #06231a; --warn: #f0925f;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.45;
+  padding-block: 20px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 28px; }
+h1, h2, h3 { font-family: var(--font-display); margin: 0; text-wrap: balance; }
+h1 { font-size: 1.5rem; font-weight: 600; }
+h2 { font-size: 1.05rem; font-weight: 600; margin-bottom: 12px; }
+h3 { font-size: 1.1rem; font-weight: 500; min-width: 0; overflow-wrap: anywhere; }
+p { margin: 0; }
+.num, .big, .meta, .unit, .damt { font-variant-numeric: tabular-nums; }
+
+.top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.status { font-size: 0.8rem; color: var(--muted); }
+.status.bad { color: var(--warn); }
+
+.sum { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+.eyebrow { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.big { font-family: var(--font-display); font-size: 3rem; font-weight: 600; line-height: 1.05; overflow-wrap: anywhere; }
+.big small, .left .unit { font-family: var(--font-body); font-size: 1rem; font-weight: 400; color: var(--muted); }
+.aedline { font-weight: 500; }
+.allpaid { color: var(--accent); font-weight: 600; }
+.meta { font-size: 0.875rem; color: var(--muted); }
+
+.bar { height: 10px; background: var(--track); border-radius: 99px; overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+@media (prefers-reduced-motion: no-preference) { .bar i { transition: width 0.3s ease; } }
+
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.debt { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; }
+.left { text-align: right; }
+.left .num { font-family: var(--font-display); font-size: 1.4rem; font-weight: 600; }
+.actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pay { display: flex; gap: 8px; flex: 1 1 240px; min-width: 0; }
+.pay input { flex: 1 1 0; min-width: 0; }
+
+.done { display: flex; align-items: center; gap: 8px 12px; flex-wrap: wrap; padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.done svg { flex: none; color: var(--accent); }
+.dname { flex: 1 1 120px; min-width: 0; overflow-wrap: anywhere; }
+.damt { color: var(--muted); font-size: 0.9rem; }
+.note { color: var(--muted); padding: 16px; border: 1px dashed var(--line); border-radius: 12px; }
+
+button, input, select { font: inherit; color: inherit; }
+button { min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); font-weight: 600; }
+button.ghost { background: transparent; color: var(--muted); }
+button.danger { color: var(--warn); border-color: var(--warn); background: transparent; }
+input, select { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); width: 100%; min-width: 0; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.rate { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.rate label { font-weight: 500; }
+.rate input { width: 110px; flex: none; }
+.rate .err { flex-basis: 100%; }
+.tools { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.tools .status { flex: 1 1 160px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+.f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.f.wide { grid-column: 1 / -1; }
+.f label { font-size: 0.8rem; color: var(--muted); }
+.err { color: var(--warn); font-size: 0.875rem; }
+.add form { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+</style>
+
+<main class="wrap" id="main">
+  <header class="top">
+    <h1>My Debt Tracker</h1>
+    <p class="status" id="status" role="status">Loading…</p>
+  </header>
+
+  <section class="sum" id="summary" aria-live="polite"></section>
+
+  <div class="rate">
+    <label for="rate-input">Dirham rate: 1 AED =</label>
+    <input id="rate-input" inputmode="decimal" autocomplete="off" placeholder="49">
+    <span>birr</span>
+    <p class="err" id="rate-err" role="alert"></p>
+  </div>
+
+  <div class="tools">
+    <button type="button" id="export-btn" hidden>Export PDF</button>
+    <p class="status" id="exp-msg" role="status"></p>
+  </div>
+
+  <section>
+    <h2 id="open-title">Still to pay</h2>
+    <ul class="list" id="open-list"></ul>
+  </section>
+
+  <section id="done-sec" hidden>
+    <h2>Finished</h2>
+    <ul class="list" id="done-list"></ul>
+  </section>
+
+  <section class="add">
+    <h2>Add a debt</h2>
+    <form id="add-form" novalidate>
+      <div class="grid">
+        <div class="f wide"><label for="add-name">Who or what</label><input id="add-name" autocomplete="off" placeholder="Name"></div>
+        <div class="f"><label for="add-total">Total owed</label><input id="add-total" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+        <div class="f"><label for="add-cur">Currency</label>
+          <select id="add-cur"><option value="ETB">Birr</option><option value="AED">Dirham (AED)</option></select></div>
+        <div class="f wide"><label for="add-paid">Already paid (optional)</label><input id="add-paid" inputmode="decimal" autocomplete="off" placeholder="0"></div>
+      </div>
+      <p class="err" id="add-err" role="alert"></p>
+      <button type="submit" class="primary">Add debt</button>
+    </form>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+(function () {
+  var KEY = 'my-debt-tracker-v1';
+  var state = { debts: [], rate: 0 };
+  var ready = false, mode = 'loading', docRef = null, timer = null;
+  var chain = Promise.resolve();
+  var pendingRender = false;
+  var ui = { editing: {}, err: {}, confirmDel: null };
+
+  var fmt = new Intl.NumberFormat('en-US', { maximumFractionDigits: 2 });
+  var money = function (n) { return fmt.format(n); };
+  var r2 = function (n) { return Math.round(n * 100) / 100; };
+  var left = function (d) { return Math.max(0, r2(d.total - d.paid)); };
+  var unit = function (c) { return c === 'AED' ? 'AED' : 'birr'; };
+  var esc = function (s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var num = function (v) { var n = parseFloat(String(v).replace(/[,\s]/g, '')); return isFinite(n) ? n : NaN; };
+  var uid = function () { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); };
+  var $ = function (id) { return document.getElementById(id); };
+  var val = function (id) { var el = $(id); return el ? el.value : ''; };
+
+  function clean(d) {
+    var o = { id: String(d.id), name: String(d.name || 'Untitled'), cur: d.cur === 'AED' ? 'AED' : 'ETB', total: +d.total || 0, paid: +d.paid || 0 };
+    if (d.paidBefore != null) o.paidBefore = +d.paidBefore;
+    return o;
+  }
+
+  function setStatus(t, bad) { var s = $('status'); s.textContent = t; s.classList.toggle('bad', !!bad); }
+
+  function save() {
+    if (mode === 'local') {
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      setStatus('Saved on this device only');
+      return;
+    }
+    if (!docRef) return;
+    setStatus('Saving…');
+    var body = JSON.parse(JSON.stringify({ debts: state.debts, rate: state.rate || 0 }));
+    chain = chain.then(function () { return docRef.set(body); }).then(
+      function () { setStatus('Saved'); },
+      function () { setStatus('Could not save. Check your connection and try again.', true); }
+    );
+  }
+
+  function sums(c) {
+    var t = 0, p = 0;
+    state.debts.forEach(function (d) { if (d.cur === c) { t += d.total; p += Math.min(d.paid, d.total); } });
+    return { t: t, p: p, l: Math.max(0, r2(t - p)) };
+  }
+
+  function combo() {
+    var b = sums('ETB'), a = sums('AED'), r = state.rate > 0 ? state.rate : 0;
+    var conv = a.t > 0 && r > 0;
+    return { b: b, a: a, r: r, conv: conv, t: b.t + (conv ? a.t * r : 0), p: b.p + (conv ? a.p * r : 0), l: r2(b.l + (conv ? a.l * r : 0)) };
+  }
+
+  function renderSummary() {
+    var el = $('summary');
+    if (!ready) { el.innerHTML = '<p class="eyebrow">Left to pay</p><p class="big">…</p>'; return; }
+    var k = combo(), b = k.b, a = k.a;
+    var h = '<p class="eyebrow">' + (k.conv ? 'Left to pay, all in birr' : 'Left to pay') + '</p><p class="big">' + money(k.conv ? k.l : b.l) + ' <small>birr</small></p>';
+    if (k.conv && a.l > 0) h += '<p class="aedline">' + money(b.l) + ' birr + ' + money(a.l) + ' AED (' + money(r2(a.l * k.r)) + ' birr at ' + money(k.r) + ')</p>';
+    else if (!k.conv && a.t > 0) h += '<p class="aedline">' + (a.l > 0 ? '+ ' + money(a.l) + ' AED (dirham)' : 'Dirham debts are all paid') + '</p><p class="meta">Set the dirham rate below to add it to the total.</p>';
+    if (b.t > 0) {
+      var tt = k.conv ? k.t : b.t, pp = k.conv ? k.p : b.p;
+      var pct = Math.min(100, Math.round(pp / tt * 100));
+      h += '<div class="bar" role="img" aria-label="' + pct + '% of birr paid"><i style="width:' + pct + '%"></i></div>';
+      h += '<p class="meta">Paid ' + money(pp) + ' of ' + money(tt) + ' birr</p>';
+    }
+    if (state.debts.length && b.l === 0 && a.l === 0) h += '<p class="allpaid">Everything is paid.</p>';
+    el.innerHTML = h;
+  }
+
+  function errLine(id) { return ui.err[id] ? '<p class="err" role="alert">' + esc(ui.err[id]) + '</p>' : ''; }
+
+  function editCard(d) {
+    var id = d.id;
+    return '<li class="debt" data-id="' + id + '"><div class="grid">' +
+      '<div class="f wide"><label for="e-name-' + id + '">Name</label><input id="e-name-' + id + '" value="' + esc(d.name) + '" autocomplete="off"></div>' +
+      '<div class="f"><label for="e-cur-' + id + '">Currency</label><select id="e-cur-' + id + '"><option value="ETB"' + (d.cur === 'ETB' ? ' selected' : '') + '>Birr</option><option value="AED"' + (d.cur === 'AED' ? ' selected' : '') + '>Dirham (AED)</option></select></div>' +
+      '<div class="f"><label for="e-total-' + id + '">Total owed</label><input id="e-total-' + id + '" inputmode="decimal" value="' + d.total + '" autocomplete="off"></div>' +
+      '<div class="f"><label for="e-paid-' + id + '">Paid so far</label><input id="e-paid-' + id + '" inputmode="decimal" value="' + d.paid + '" autocomplete="off"></div>' +
+      '</div>' + errLine(id) +
+      '<div class="actions"><button type="button" class="primary" data-act="save">Save</button>' +
+      '<button type="button" class="ghost" data-act="cancel">Cancel</button>' +
+      '<button type="button" class="danger" data-act="del">' + (ui.confirmDel === id ? 'Tap again to delete' : 'Delete') + '</button></div></li>';
+  }
+
+  function openCard(d) {
+    if (ui.editing[d.id]) return editCard(d);
+    var id = d.id, pct = Math.min(100, Math.round(d.paid / d.total * 100));
+    return '<li class="debt" data-id="' + id + '">' +
+      '<div class="head"><h3>' + esc(d.name) + '</h3><p class="left"><span class="num">' + money(left(d)) + '</span> <span class="unit">' + unit(d.cur) + ' left</span></p></div>' +
+      '<div class="bar" role="img" aria-label="' + pct + '% paid"><i style="width:' + pct + '%"></i></div>' +
+      '<p class="meta">Paid ' + money(d.paid) + ' of ' + money(d.total) + ' ' + unit(d.cur) + (d.cur === 'AED' && state.rate > 0 && left(d) > 0 ? ' · ' + money(r2(left(d) * state.rate)) + ' birr left' : '') + '</p>' +
+      '<div class="actions"><div class="pay"><label class="sr" for="pay-' + id + '">Payment amount for ' + esc(d.name) + '</label>' +
+      '<input id="pay-' + id + '" data-enter="addpay" inputmode="decimal" autocomplete="off" placeholder="Amount paid">' +
+      '<button type="button" data-act="addpay">Add payment</button></div>' +
+      '<button type="button" class="primary" data-act="finish">Finish</button>' +
+      '<button type="button" class="ghost" data-act="edit">Edit</button></div>' + errLine(id) + '</li>';
+  }
+
+  function doneRow(d) {
+    if (ui.editing[d.id]) return editCard(d);
+    return '<li class="done" data-id="' + d.id + '">' +
+      '<svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M6 10.5l2.7 2.7L14 7.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+      '<span class="dname">' + esc(d.name) + '</span><span class="damt">' + money(d.total) + ' ' + unit(d.cur) + '</span>' +
+      '<button type="button" class="ghost" data-act="reopen">Reopen</button>' +
+      '<button type="button" class="ghost" data-act="edit">Edit</button></li>';
+  }
+
+  function render() {
+    pendingRender = false;
+    var ri = $('rate-input');
+    if (ri && document.activeElement !== ri) ri.value = state.rate > 0 ? String(state.rate) : '';
+    renderSummary();
+    var open = state.debts.filter(function (d) { return left(d) > 0; });
+    var done = state.debts.filter(function (d) { return left(d) <= 0; });
+    var ol = $('open-list');
+    if (!ready) ol.innerHTML = '<li class="note">Loading your debts…</li>';
+    else if (!open.length) ol.innerHTML = '<li class="note">' + (state.debts.length ? 'Nothing left to pay.' : 'No debts yet. Add one below.') + '</li>';
+    else ol.innerHTML = open.map(openCard).join('');
+    $('done-sec').hidden = !done.length;
+    $('done-list').innerHTML = done.map(doneRow).join('');
+  }
+
+  function typing() { var a = document.activeElement; return a && (a.tagName === 'INPUT' || a.tagName === 'SELECT') && $('main').contains(a) && a.id.indexOf('add-') !== 0 ? true : false; }
+  function scheduleRender() { if (typing()) pendingRender = true; else render(); }
+  document.addEventListener('focusout', function () {
+    if (pendingRender) setTimeout(function () { if (!typing()) render(); }, 0);
+  });
+
+  function commit() { save(); render(); }
+
+  function act(name, d) {
+    var id = d.id;
+    delete ui.err[id];
+    if (name === 'addpay') {
+      var n = num(val('pay-' + id));
+      if (!(n > 0)) { ui.err[id] = 'Enter the amount you paid.'; render(); return; }
+      d.paid = Math.min(d.total, r2(d.paid + n));
+      delete d.paidBefore;
+      commit();
+    } else if (name === 'finish') {
+      d.paidBefore = d.paid; d.paid = d.total; commit();
+    } else if (name === 'reopen') {
+      d.paid = (d.paidBefore != null && d.paidBefore < d.total) ? d.paidBefore : 0;
+      delete d.paidBefore; commit();
+    } else if (name === 'edit') {
+      ui.editing[id] = true; ui.confirmDel = null; render();
+    } else if (name === 'cancel') {
+      delete ui.editing[id]; ui.confirmDel = null; render();
+    } else if (name === 'save') {
+      var nm = val('e-name-' + id).trim(), total = num(val('e-total-' + id)), paid = num(val('e-paid-' + id) || '0');
+      var e = !nm ? 'Enter a name.' : !(total > 0) ? 'Total must be more than 0.' : !(paid >= 0) ? 'Paid must be 0 or more.' : paid > total ? "Paid can't be more than the total." : '';
+      if (e) { ui.err[id] = e; render(); return; }
+      d.name = nm; d.cur = val('e-cur-' + id) === 'AED' ? 'AED' : 'ETB'; d.total = total; d.paid = paid;
+      delete d.paidBefore; delete ui.editing[id]; ui.confirmDel = null; commit();
+    } else if (name === 'del') {
+      if (ui.confirmDel === id) {
+        state.debts = state.debts.filter(function (x) { return x.id !== id; });
+        delete ui.editing[id]; ui.confirmDel = null; commit();
+      } else { ui.confirmDel = id; render(); }
+    }
+  }
+
+  $('main').addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-act]');
+    if (!b || !ready) return;
+    var li = b.closest('[data-id]');
+    var d = li && state.debts.find(function (x) { return x.id === li.dataset.id; });
+    if (d) act(b.dataset.act, d);
+  });
+  $('main').addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter') return;
+    var t = ev.target;
+    if (t.dataset && t.dataset.enter) {
+      ev.preventDefault();
+      var li = t.closest('[data-id]');
+      var d = li && state.debts.find(function (x) { return x.id === li.dataset.id; });
+      if (d && ready) act(t.dataset.enter, d);
+    }
+  });
+
+  $('add-form').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var er = $('add-err'); er.textContent = '';
+    if (!ready) { er.textContent = 'Still loading. Try again in a moment.'; return; }
+    var nm = val('add-name').trim(), total = num(val('add-total')), paid = num(val('add-paid') || '0');
+    var e = !nm ? 'Enter a name.' : !(total > 0) ? 'Total must be more than 0.' : !(paid >= 0) ? 'Already paid must be 0 or more.' : paid > total ? "Already paid can't be more than the total." : '';
+    if (e) { er.textContent = e; return; }
+    state.debts.push({ id: uid(), name: nm, cur: val('add-cur') === 'AED' ? 'AED' : 'ETB', total: total, paid: paid });
+    $('add-form').reset();
+    commit();
+  });
+
+  var dl = null;
+  function expMsg(t, bad) { var m = $('exp-msg'); m.textContent = t; m.classList.toggle('bad', !!bad); }
+
+  async function exportPdf() {
+    expMsg('');
+    if (!window.jspdf || !window.jspdf.jsPDF) { expMsg('The PDF maker did not load. Reload the page and try again.', true); return; }
+    if (!dl) { expMsg('Saving files is not available here.', true); return; }
+    if (!ready || !state.debts.length) { expMsg('Add a debt first.', true); return; }
+    var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    var M = 18, R = 192, y = M;
+    var safe = function (s) { return String(s).replace(/[^\x20-\x7E -ÿ]/g, '?'); };
+    var now = new Date();
+    var pretty = now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    var iso = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+    var curLabel = function (c) { return c === 'AED' ? 'Dirham (AED)' : 'Birr'; };
+
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(20);
+    doc.text('Debt summary', M, y + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(100);
+    doc.text('Printed ' + pretty, R, y + 6, { align: 'right' });
+    y += 18;
+
+    ['ETB', 'AED'].forEach(function (c) {
+      var s = sums(c); if (!s.t) return;
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20);
+      doc.text(curLabel(c), M, y); y += 6;
+      [['Total debt', s.t, M], ['Paid', s.p, M + 60], ['Left to pay', s.l, M + 120]].forEach(function (k) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110); doc.text(k[0].toUpperCase(), k[2], y);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(20); doc.text(money(k[1]), k[2], y + 6);
+      });
+      y += 16;
+    });
+
+    var kk = combo();
+    if (kk.conv) {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(20);
+      doc.text('All in birr (1 AED = ' + money(kk.r) + ' birr)', M, y); y += 6;
+      [['Total debt', kk.t, M], ['Paid', kk.p, M + 60], ['Left to pay', kk.l, M + 120]].forEach(function (k) {
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(110); doc.text(k[0].toUpperCase(), k[2], y);
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(13); doc.setTextColor(20); doc.text(money(k[1]), k[2], y + 6);
+      });
+      y += 16;
+    }
+
+    var header = function () {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(8); doc.setTextColor(110);
+      doc.text('NAME', M, y); doc.text('CURRENCY', 80, y);
+      doc.text('TOTAL', 118, y, { align: 'right' }); doc.text('PAID', 146, y, { align: 'right' });
+      doc.text('LEFT', 172, y, { align: 'right' }); doc.text('STATUS', 176, y);
+      y += 2; doc.setDrawColor(40); doc.setLineWidth(0.4); doc.line(M, y, R, y); y += 1;
+    };
+    header();
+
+    var rows = state.debts.filter(function (d) { return left(d) > 0; }).concat(state.debts.filter(function (d) { return left(d) <= 0; }));
+    rows.forEach(function (d) {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      var lines = doc.splitTextToSize(safe(d.name), 58);
+      var h = lines.length * 4.8 + 3.5;
+      if (y + h > 282) { doc.addPage(); y = M; header(); }
+      var fin = left(d) <= 0, ty = y + 5;
+      doc.setTextColor(fin ? 110 : 20);
+      doc.text(lines, M, ty);
+      doc.text(d.cur === 'AED' ? 'AED' : 'Birr', 80, ty);
+      doc.text(money(d.total), 118, ty, { align: 'right' });
+      doc.text(money(d.paid), 146, ty, { align: 'right' });
+      doc.setFont('helvetica', fin ? 'normal' : 'bold');
+      doc.text(money(left(d)), 172, ty, { align: 'right' });
+      doc.setFont('helvetica', 'normal');
+      doc.text(fin ? 'Finished' : 'Open', 176, ty);
+      y += h;
+      doc.setDrawColor(210); doc.setLineWidth(0.2); doc.line(M, y, R, y);
+    });
+
+    y += 4;
+    ['ETB', 'AED'].forEach(function (c) {
+      var s = sums(c); if (!s.t) return;
+      if (y > 276) { doc.addPage(); y = M; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20);
+      doc.text('Total ' + (c === 'AED' ? 'dirham (AED)' : 'birr'), M, y + 5);
+      doc.text(money(s.t), 118, y + 5, { align: 'right' });
+      doc.text(money(s.p), 146, y + 5, { align: 'right' });
+      doc.text(money(s.l), 172, y + 5, { align: 'right' });
+      y += 8;
+    });
+    if (kk.conv) {
+      if (y > 276) { doc.addPage(); y = M; }
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.setTextColor(20);
+      doc.text('Total, all in birr', M, y + 5);
+      doc.text(money(kk.t), 118, y + 5, { align: 'right' });
+      doc.text(money(kk.p), 146, y + 5, { align: 'right' });
+      doc.text(money(kk.l), 172, y + 5, { align: 'right' });
+      y += 8;
+    }
+
+    try {
+      var r = await dl.save({ filename: 'debt-summary-' + iso + '.pdf', data: doc.output('arraybuffer') });
+      expMsg(r && r.status === 'saved' ? 'PDF saved. Open it to print.' : 'PDF sent.');
+    } catch (e) {
+      var cancelled = e && e.code === 'declined';
+      expMsg(cancelled ? 'Download cancelled.' : 'Could not save the PDF. Try again.', !cancelled);
+    }
+  }
+  $('export-btn').addEventListener('click', exportPdf);
+
+  function setRate() {
+    var er = $('rate-err'); er.textContent = '';
+    var v = num($('rate-input').value);
+    if (!(v > 0)) { er.textContent = 'Enter how many birr 1 dirham is worth.'; return; }
+    if (!ready) { er.textContent = 'Still loading. Try again in a moment.'; return; }
+    if (v === state.rate) return;
+    state.rate = v;
+    commit();
+  }
+  $('rate-input').addEventListener('change', setRate);
+  $('rate-input').addEventListener('keydown', function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); ev.target.blur(); } });
+
+  function init() {
+    render();
+    try {
+      Promise.resolve(window.claude && window.claude.use ? window.claude.use('downloads') : null).then(function (d) {
+        if (d) { dl = d; $('export-btn').hidden = false; }
+      }, function () {});
+    } catch (e) {}
+    var p;
+    try { p = window.claude && window.claude.use ? window.claude.use('db') : Promise.resolve(null); } catch (e) { p = Promise.resolve(null); }
+    Promise.resolve(p).catch(function () { return null; }).then(function (db) {
+      if (db) {
+        mode = 'cloud';
+        docRef = db.doc('tracker/main');
+        timer = setTimeout(function () {
+          if (!ready) setStatus('Still loading. Your list will appear when the connection is back.', true);
+        }, 10000);
+        docRef.onSnapshot(function (snap) {
+          clearTimeout(timer);
+          var first = !ready;
+          ready = true;
+          if (snap.metadata.hasPendingWrites && !first) return;
+          var d = snap.data();
+          state = { debts: Array.isArray(d && d.debts) ? d.debts.map(clean) : [], rate: +(d && d.rate) || 0 };
+          if (!snap.metadata.fromCache) setStatus('Saved');
+          first ? render() : scheduleRender();
+        }, function (err) {
+          clearTimeout(timer);
+          setStatus(err && err.code === 'revoked' ? 'Access to this list was removed.' : 'Could not load your list.', true);
+        });
+      } else {
+        mode = 'local';
+        try { var s = JSON.parse(localStorage.getItem(KEY) || 'null'); if (s && Array.isArray(s.debts)) state = { debts: s.debts.map(clean), rate: +s.rate || 0 }; } catch (e) {}
+        ready = true;
+        setStatus('Saved on this device only');
+        render();
+      }
+    });
+  }
+  init();
+})();
+</script>
+
+</body></html>
